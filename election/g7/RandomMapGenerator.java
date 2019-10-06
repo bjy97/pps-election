@@ -18,7 +18,7 @@ public class RandomMapGenerator implements election.sim.MapGenerator {
         triangle.lineTo(1000., 0.);
         triangle.lineTo(500., 500. * Math.sqrt(3));
         triangle.closePath();
-        Double[][] preference = null;
+//        Double[][] preference = null;
         Double[][] populationMap = null;
         try {
             String path = new File("").getAbsolutePath();
@@ -38,22 +38,23 @@ public class RandomMapGenerator implements election.sim.MapGenerator {
 
         for (int i = 0; i < popRow; i++) {
             for (int j = 0; j < popCol; j++) {
-                if (triangle.contains(heightRatio*(popRow - i - 1), widthRatio*j))
+                if (triangle.contains(widthRatio*j, heightRatio*(popRow - i - 1)))
                     count += populationMap[i][j];
             }
         }
 
         double populationRatio = numVoters * 1.0 / count;
-
         count = 0;
-
+        int countL = 0, countR = 0;
         // Distribute the people according to the denstiy map.
         for (int i = 0; i < popRow; i++) {
             for (int j = 0; j < popCol; j++) {
-                double landX = heightRatio*(popRow - i - 1), landY = widthRatio*j;
+                double landY = heightRatio*(popRow - i - 1), landX = widthRatio*j;
                 if (!triangle.contains(landX, landY))
                     continue;
                 int num = (int)(populationMap[i][j] * populationRatio);
+                if (landY > 800 && landX >= 0 && landX < 20)
+                    countR += num;
                 for (int k = 0; k < num; k++) {
                     double x, y;
                     do {
@@ -65,11 +66,16 @@ public class RandomMapGenerator implements election.sim.MapGenerator {
                         x += randomX;
                         y += randomY;
                     } while (!triangle.contains(x, y));
-                    ret.add(new Voter(new Point2D.Double(landX, landY), new ArrayList<Double>()));
+                    if (y < 200 && x >= 0 && x < 20)
+                        countL += num;
+
+                    List<Double> preference = new ArrayList<Double>();
+                    preference.add(1.0); preference.add(1.0);
+                    ret.add(new Voter(new Point2D.Double(x, y), preference));
                 }
             }
-        }
 
+        }
         //Randomly distribute the left people.
         while(ret.size() < numVoters) {
             double x, y;
@@ -77,7 +83,9 @@ public class RandomMapGenerator implements election.sim.MapGenerator {
                 x = random.nextDouble() * 1000.0;
                 y = random.nextDouble() * 900.0;
             } while (!triangle.contains(x, y));
-            ret.add(new Voter(new Point2D.Double(x, y), new ArrayList<Double>()));
+            List<Double> preference = new ArrayList<Double>();
+            preference.add(1.0); preference.add(1.0);
+            ret.add(new Voter(new Point2D.Double(x, y), preference));
         }
 
         return ret;
