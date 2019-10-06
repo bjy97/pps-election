@@ -7,7 +7,6 @@ import election.sim.*;
 
 public class RandomMapGenerator implements election.sim.MapGenerator {
     private static double scale = 1000.0;
-    private int city = 10;
 
     @Override
     public List<Voter> getVoters(int numVoters, int numParties, long seed) {
@@ -20,42 +19,65 @@ public class RandomMapGenerator implements election.sim.MapGenerator {
         triangle.lineTo(500., 500. * Math.sqrt(3));
         triangle.closePath();
         Double[][] preference = null;
-        Double[][] population = null;
+        Double[][] populationMap = null;
         try {
             String path = new File("").getAbsolutePath();
-            preference = readCSVFile(path + "/election/g7/preference.csv");
+            populationMap = readCSVFile(path + "/election/g7/population.csv");
         } catch (Exception e) {
             String path = new File("").getAbsolutePath();
             System.out.println("Cannot read csv file in " + path);
         }
-        int row = preference.length;
-        int col = preference[0].length;
-        System.out.println("row: " + row + ", col: "+ col);
 
-        for (int i = 0; i < city; i++) {
-            double x,y;
+        //Count popluation for triangle.
+        int count = 0;
+        int popRow = populationMap.length;
+        int popCol = populationMap[0].length;
+
+        double heightRatio = 500. * Math.sqrt(3) / popRow;
+        double widthRatio = 1000.0 / popCol;
+
+        for (int i = 0; i < popRow; i++) {
+            for (int j = 0; j < popCol; j++) {
+                if (triangle.contains(heightRatio*(popRow - i - 1), widthRatio*j))
+                    count += populationMap[i][j];
+            }
+        }
+
+        double populationRatio = numVoters * 1.0 / count;
+
+        count = 0;
+
+        // Distribute the people according to the denstiy map.
+        for (int i = 0; i < popRow; i++) {
+            for (int j = 0; j < popCol; j++) {
+                double landX = heightRatio*(popRow - i - 1), landY = widthRatio*j;
+                if (!triangle.contains(landX, landY))
+                    continue;
+                int num = (int)(populationMap[i][j] * populationRatio);
+                for (int k = 0; k < num; k++) {
+                    double x, y;
+                    do {
+                        x = landX;
+                        y = landY;
+                        // random x offset from -widthRatio/2 to widthRatio/2
+                        double randomX = widthRatio * random.nextDouble() - widthRatio/2;
+                        double randomY = heightRatio * random.nextDouble() - heightRatio/2;
+                        x += randomX;
+                        y += randomY;
+                    } while (!triangle.contains(x, y));
+                    ret.add(new Voter(new Point2D.Double(landX, landY), new ArrayList<Double>()));
+                }
+            }
+        }
+
+        //Randomly distribute the left people.
+        while(ret.size() < numVoters) {
+            double x, y;
             do {
                 x = random.nextDouble() * 1000.0;
                 y = random.nextDouble() * 900.0;
             } while (!triangle.contains(x, y));
-            citys.add(new double[] {x, y});
-        }
-
-        for (int i = 0; i < numVoters; ++ i) {
-            double x, y;
-            int cityId = random.nextInt(city - 1);
-            double cityX = citys.get(cityId)[0];
-            double cityY = citys.get(cityId)[1];
-            do {
-                double distance = 1 / random.nextDouble();
-                double angle = -Math.PI/2 + Math.PI*random.nextDouble();
-                x = cityX + Math.cos(angle)*distance;
-                y = cityY + Math.sin(angle)*distance;
-            } while (!triangle.contains(x, y));
-            List<Double> pref = new ArrayList<Double>();
-            for (int j = 0; j < numParties; ++ j)
-                pref.add(random.nextDouble());
-            ret.add(new Voter(new Point2D.Double(x, y), pref));
+            ret.add(new Voter(new Point2D.Double(x, y), new ArrayList<Double>()));
         }
 
         return ret;
