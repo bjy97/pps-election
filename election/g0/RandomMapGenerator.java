@@ -32,4 +32,3 @@ public class RandomMapGenerator implements election.sim.MapGenerator {
         }
         return ret;
     }
-}
