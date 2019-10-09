@@ -9,6 +9,9 @@ public class DistrictGenerator implements election.sim.DistrictGenerator {
     private Random random;
     private int numVoters, numParties, numDistricts;
     private double eps = 1E-7;
+    private List<List<Polygon2D>> polyganList;
+    private Map<Integer, Polygon2D> polygonMap;
+    private Map<Integer, Boolean> checkMap;
 
     public List<Voter> sortByXCoordinate(List<Voter>voters){
         Collections.sort(voters, new Comparator<Voter>() {
@@ -76,6 +79,24 @@ public class DistrictGenerator implements election.sim.DistrictGenerator {
 
             System.out.println(result.size());
             return result;
+        }
+
+        private double getWidth(double len) {
+            return 0.0;
+        }
+
+        private List<Map<Integer, Double>> getAdjacentDistricts(int id) {
+            List<Map<Integer, Double>> list = new ArrayList<>();
+            return list;
+        }
+
+        private boolean isSwingState(Polygon2D polygon2D, List<Voter> voters, int partyToWin) {
+            return false;
+        }
+
+        //Check population is valid for two polygon2 and if how beneficial it is for digging.
+        private boolean isValidGerrymander(Polygon2D swing, Polygon2D other, List<Voter> voters, int partyToWin) {
+            return false;
         }
 }
 
