@@ -9,8 +9,9 @@ public class DistrictGenerator implements election.sim.DistrictGenerator {
     private Random random;
     private int numVoters, numParties, numDistricts;
     private double eps = 1E-7;
-    private List<List<Polygon2D>> polyganList;
+    private List<Map<Polygon2D, List<Voter>>> polyganList;
     private Map<Integer, Polygon2D> polygonMap;
+    private Map<Integer, List<Voter>> voterMap;
     private Map<Integer, Boolean> checkMap;
 
     public List<Voter> sortByXCoordinate(List<Voter>voters){
@@ -76,6 +77,13 @@ public class DistrictGenerator implements election.sim.DistrictGenerator {
                 result.add(polygon);
             }
         }
+            int i = 0;
+            for (Map<Polygon2D, List<Voter>> map : polyganList) {
+                for (Map.Entry<Polygon2D, List<Voter>> entry: map.entrySet()){
+                    polygonMap.put(i, entry.getKey());
+                    voterMap.put(i++, entry.getValue());
+                }
+            }
 
             System.out.println(result.size());
             return result;
