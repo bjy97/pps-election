@@ -78,19 +78,18 @@ public class DistrictGenerator implements election.sim.DistrictGenerator {
                 result.add(polygon);
             }
         }
-        int i = 0;
+        int index = 0;
         for (Map<Polygon2D, List<Voter>> map : polyganList) {
             for (Map.Entry<Polygon2D, List<Voter>> entry: map.entrySet()){
-                polygonMap.put(i, entry.getKey());
-                voterMap.put(i++, entry.getValue());
-                checkMap.put(i, false);
+                polygonMap.put(index, entry.getKey());
+                voterMap.put(index++, entry.getValue());
+                checkMap.put(index, false);
             }
         }
 
         for (Map.Entry<Integer, Polygon2D> entry : polygonMap.entrySet()) {
             int id = entry.getKey();
             if (!checkMap.get(id) && !isSwingState(id)) {
-                checkMap.put(id, true);
                 Map<Integer, double[]> adjacentDistricts = getAdjacentDistricts(id);
                 Polygon2D swing = entry.getValue();
                 for (Map.Entry<Integer, double[]> adjacentDistrict : adjacentDistricts.entrySet()) {
@@ -99,12 +98,45 @@ public class DistrictGenerator implements election.sim.DistrictGenerator {
                     double x1 = edge[0], y1 = edge[1], x2 = edge[2], y2 = edge[3];
                     double len = Math.sqrt((x1 - x2)*(x1 - x2) + (y1 - y2)*(y1 - y2));
                     double width = getWidth(len);
-
+                    List<Point2D> swingPoints = swing.getPoints();
+                    List<Point2D> adjacentPoints = polygonMap.get(otherId).getPoints();
+                    //vertical line
+                    if (isEqual(x1, x2)) {
+                        double start = Math.max(y1, y2);
+                        double end = Math.min(y1, y2);
+                        for (double i = start; i - end >= width; i -= width) {
+                            Polygon2D concaveSwing = new Polygon2D();
+                            Polygon2D convexAdjacent = new Polygon2D();
+                            Polygon2D concaveAdjacent = new Polygon2D();
+                            Polygon2D convexSwing = new Polygon2D();
+                            buildPolygonByY(swingPoints, concaveSwing, convexSwing, x1, i, width);
+                            buildPolygonByY(adjacentPoints, concaveAdjacent, convexAdjacent, x1, i, width);
+                            if (setNewPolygon(id, otherId, convexSwing, concaveAdjacent, concaveSwing, convexAdjacent))
+                                break;
+                        }
+                    }
+                    //horizontal line
+                    else if (isEqual(y1, y2)) {
+                        double start = Math.min(x1, x2);
+                        double end = Math.max(x1, x2);
+                        for (double i = start; end - i >= width; i += width) {
+                            Polygon2D concaveSwing = new Polygon2D();
+                            Polygon2D convexAdjacent = new Polygon2D();
+                            Polygon2D concaveAdjacent = new Polygon2D();
+                            Polygon2D convexSwing = new Polygon2D();
+                            buildPolygonByX(swingPoints, concaveSwing, convexSwing, y1, i, width);
+                            buildPolygonByX(adjacentPoints, concaveAdjacent, convexAdjacent, y1, i, width);
+                            if (setNewPolygon(id, otherId, convexSwing, concaveAdjacent, concaveSwing, convexAdjacent))
+                                break;
+                        }
+                    }
+                    else
+                        System.out.println("Adjacent edge is not vertical or horizontal!");
                 }
             }
         }
 
-        System.out.println(result.size());
+        result = new ArrayList<Polygon2D>(polygonMap.values());
         return result;
     }
 
@@ -128,4 +160,86 @@ public class DistrictGenerator implements election.sim.DistrictGenerator {
         private boolean isValidGerrymander(int swingId, int otherId, Polygon2D swing, Polygon2D other) {
             return false;
         }
+
+        //Vertical adjacent edge.
+        private void buildPolygonByY(List<Point2D> point2Ds, Polygon2D concave, Polygon2D convex, double x1, double y1,
+                                  double width) {
+            for (int j = 0; j < point2Ds.size(); j++) {
+                Point2D point2D = point2Ds.get(j);
+                concave.append(point2D);
+                convex.append(point2D);
+                // Build the triangle when bulding the overlapping edge.
+                if (isEqual(point2D.getX(), x1) && j < point2Ds.size() - 1 &&
+                        isEqual(point2Ds.get(j + 1).getX(), x1)) {
+                    double y3 = 0, y4 = 0;
+                    if (point2Ds.get(j + 1).getY() > point2D.getY()) {
+                        y3 = y1 - width;
+                        y4 = y1;
+                    }
+                    else {
+                        y3 = y1;
+                        y4 = y1 - width;
+                    }
+                    concave.append(x1, y3);
+                    concave.append(x1 - Math.sqrt(3)/2*width, (y4 + y3)/2);
+                    concave.append(x1, y4);
+                    convex.append(x1, y3);
+                    convex.append(x1 + Math.sqrt(3)/2*width, (y4 + y3)/2);
+                    convex.append(x1, y4);
+                }
+            }
+        }
+
+        //Horizontal adjacent edge.
+        private void buildPolygonByX(List<Point2D> point2Ds, Polygon2D concave, Polygon2D convex, double y1, double x1,
+                                     double width) {
+            for (int j = 0; j < point2Ds.size(); j++) {
+                Point2D point2D = point2Ds.get(j);
+                concave.append(point2D);
+                convex.append(point2D);
+                // Build the triangle when bulding the overlapping edge.
+                if (isEqual(point2D.getY(), y1) && j < point2Ds.size() - 1 &&
+                        isEqual(point2Ds.get(j + 1).getY(), y1)) {
+                    double x3 = 0, x4 = 0;
+                    if (point2Ds.get(j + 1).getX() > point2D.getX()) {
+                        x3 = x1;
+                        x4 = x1 + width;
+                    }
+                    else {
+                        x3 = x1 + width;
+                        x4 = x1;
+                    }
+                    concave.append(x3, y1);
+                    concave.append((x3 + x4)/2, y1 + Math.sqrt(3)/2*width);
+                    concave.append(x4, y1);
+                    convex.append(x3, y1);
+                    convex.append((x3 + x4)/2, y1 - Math.sqrt(3)/2*width);
+                    convex.append(x4, y1);
+                }
+            }
+        }
+
+        private boolean setNewPolygon(int id, int otherId, Polygon2D convexSwing, Polygon2D concaveAdjacent,
+                                      Polygon2D concaveSwing, Polygon2D convexAdjacent) {
+            if (isValidGerrymander(id, otherId, convexSwing, concaveAdjacent)) {
+                checkMap.put(id, true);
+                checkMap.put(otherId, true);
+                polygonMap.put(id, convexSwing);
+                polygonMap.put(otherId, concaveAdjacent);
+                return true;
+            }
+            if (isValidGerrymander(id, otherId, concaveSwing, convexAdjacent)) {
+                checkMap.put(id, true);
+                checkMap.put(otherId, true);
+                polygonMap.put(id, concaveSwing);
+                polygonMap.put(otherId, convexAdjacent);
+                return true;
+            }
+            return false;
+        }
+
+        private boolean isEqual(double a, double b) {
+            return Math.abs(a - b) <= eps;
+        }
+
 }
