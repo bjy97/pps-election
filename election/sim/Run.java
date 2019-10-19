@@ -10,7 +10,7 @@ import java.lang.reflect.InvocationTargetException;
 
 public class Run {
     private static long seed = 20190918;
-    private static long timeLimit = 10000;
+    private static long timeLimit = 100000000;
     private static long elapsedTime;
 
     private static Random random;

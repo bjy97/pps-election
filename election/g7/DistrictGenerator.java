@@ -15,6 +15,9 @@ public class DistrictGenerator implements election.sim.DistrictGenerator {
     private Map<Integer, Boolean> checkMap = new HashMap<>();
     private int partyToWin = 1;
     private Polygon2D board;
+    private int iteration = 20;
+    private double widthRatio = 5;
+    private int peopleInBlock;
 
     public List<Voter> sortByXCoordinate(List<Voter>voters){
         board = new Polygon2D();
@@ -32,37 +35,64 @@ public class DistrictGenerator implements election.sim.DistrictGenerator {
 
     @Override
     public List<Polygon2D> getDistricts(List<Voter> voters, int repPerDistrict, long seed) {
-        numVoters = voters.size();
-        numParties = voters.get(0).getPreference().size();
         List<Polygon2D> result = new ArrayList<Polygon2D>();
+        int numVoters = voters.size();
         //numDistricts = 243 / repPerDistrict;
         numDistricts = 81;
         double height = scale / 2.0 * Math.sqrt(3);
-        int numStripes = 10;
-        //Can contribute deviation
-        int peopleInBlock = numVoters / numDistricts;
-
-        int blockEachStripe =  numDistricts / numStripes; //9;
+        peopleInBlock = numVoters / numDistricts;
+        random = new Random(seed);
         Collections.sort(voters, new Comparator<Voter>() {
             @Override
             public int compare(Voter v1, Voter v2) {
                 return Double.compare(v2.getLocation().getY(), v1.getLocation().getY());
             }
         });
+        int max = 0;
+        List<Polygon2D> best = new ArrayList<>();
+        for (int i = 0; i < iteration; i++) {
+            int randomNumOfStripes = random.nextInt(4) + 8;
+            int stripeWithMoreBlocks = randomNumOfStripes - (random.nextInt(randomNumOfStripes) + 1);
+            widthRatio = random.nextDouble()*10 + 5;
+            int num = createDistricts(randomNumOfStripes, numDistricts, voters, stripeWithMoreBlocks);
+            if (max <= num) {
+                max = Math.max(num, max);
+                best = new ArrayList<>(polygonMap.values());
+            }
+            polygonMap.clear();
+            voterMap.clear();
+            checkMap.clear();
+            polyganList.clear();
+            System.out.println("number of gerrymander: " + num + ", number of stripes: " + randomNumOfStripes + ", widthRatio: " + widthRatio +
+                    ", stripeToExpand: " + stripeWithMoreBlocks);
+        }
+
+        return best;
+    }
+
+    private int createDistricts(int numStripes, int numDistricts, List<Voter> voters, int stripeWithMoreBlocks) {
+        List<Polygon2D> result = new ArrayList<>();
+        int numParties = voters.get(0).getPreference().size();
+        int numVoters = voters.size();
+        int numOfGerrymander = 0;
+        int blockEachStripe =  numDistricts / numStripes; //9;
+        //Can contribute deviation
+        int peopleInBlock = numVoters / numDistricts;
         // From top to bottom
         List<List<Voter>> votersInStripe = new ArrayList<>();
         int from = 0;
         double btm = 500*Math.sqrt(3);
         List<List<Voter>> voterList = new ArrayList<>();
         for (int i = 0; i < numStripes; i++) {
-            int to = blockEachStripe*peopleInBlock*(i + 1) - 1;
-            if (i == numStripes - 1) {
-                blockEachStripe = numDistricts - blockEachStripe * (numStripes - 1);
-                to = numVoters - 1;
+            blockEachStripe =  numDistricts / numStripes;
+            if (i == stripeWithMoreBlocks) {
+                blockEachStripe = (numDistricts - blockEachStripe * (numStripes - 1));
             }
+            int to = from + blockEachStripe*peopleInBlock - 1;
+            if (i == numStripes - 1)
+                to = numVoters - 1;
             while (to + 1 < numVoters && voters.get(to) == voters.get(to + 1))
                 to++;
-
             List<Voter> voter_by_y = voters.subList(from, to + 1);
             from = to + 1;
             double top = btm;
@@ -258,6 +288,7 @@ public class DistrictGenerator implements election.sim.DistrictGenerator {
 
                             if (setNewPolygon(id, otherId, convexSwing, concaveAdjacent, concaveSwing, convexAdjacent)) {
                                 isGerrymander = false;
+                                numOfGerrymander++;
                                 break;
                             }
                         }
@@ -277,6 +308,7 @@ public class DistrictGenerator implements election.sim.DistrictGenerator {
 
                             if (setNewPolygon(id, otherId, convexSwing, concaveAdjacent, concaveSwing, convexAdjacent)) {
                                 isGerrymander = false;
+                                numOfGerrymander++;
                                 break;
                             }
                         }
@@ -286,13 +318,11 @@ public class DistrictGenerator implements election.sim.DistrictGenerator {
             }
 
         }
-
-        result = new ArrayList<Polygon2D>(polygonMap.values());
-        return result;
+        return numOfGerrymander;
     }
 
     private double getWidth(double len) {
-        return len / 8;
+        return len / widthRatio;
     }
 
 
@@ -547,8 +577,9 @@ public class DistrictGenerator implements election.sim.DistrictGenerator {
     //Check population is valid for two polygon2 and if how beneficial it is for digging.
     private boolean isValidGerrymander(int swingId, int otherId, Polygon2D swing, Polygon2D other) {
         List<Voter> swing_voters = new ArrayList<>();
-
+        List<Voter> other_voters = new ArrayList<>();
         List<Voter> swing_voters_original = voterMap.get(swingId);
+        List<Voter> other_voters_original = voterMap.get(otherId);
 
 
         //Recalculate people in proposed districts
@@ -557,6 +588,14 @@ public class DistrictGenerator implements election.sim.DistrictGenerator {
             boolean contain_voter = swing.strictlyContains(voterMap.get(swingId).get(i).getLocation());
             if (contain_voter) {
                 swing_voters.add(voterMap.get(swingId).get(i));
+
+
+            }
+
+            boolean contain_voter_other = other.strictlyContains(voterMap.get(swingId).get(i).getLocation());
+            if (contain_voter_other) {
+                other_voters.add(voterMap.get(swingId).get(i));
+
 
             }
 
@@ -570,11 +609,22 @@ public class DistrictGenerator implements election.sim.DistrictGenerator {
 
             }
 
+            boolean contain_voter_other = other.strictlyContains(voterMap.get(otherId).get(j).getLocation());
+            if (contain_voter_other) {
+                other_voters.add(voterMap.get(otherId).get(j));
+
+            }
+
         }
+        double old_ratio_other = (double)countWin(other_voters_original)/other_voters_original.size();
+        double new_ratio_other = (double)countWin(other_voters) / other_voters.size();
+        //check if num of representative decreases
+        boolean condition1_other = new_ratio_other<0.5 && old_ratio_other >0.5;
+        boolean condition2_other = new_ratio_other<0.75 && old_ratio_other >0.75;
+        boolean condition3_other = new_ratio_other<0.25 && old_ratio_other >0.25;
 
 
 
-        int num_win = countWin(swing_voters);
 
 //        if ((double)num_win / swing_voters.size() > 0.5) {
 ////            System.out.print("old" + (double)countWin(swing_voters_original)/swing_voters_original.size());
@@ -583,6 +633,7 @@ public class DistrictGenerator implements election.sim.DistrictGenerator {
 //        }
 
         //check for all three conditions, "Genertor time out"
+        int num_win = countWin(swing_voters);
         double new_ratio = (double)num_win / swing_voters.size();
         double old_ratio = (double)countWin(swing_voters_original)/swing_voters_original.size();
 //        System.out.println("old" + old_ratio);
@@ -590,7 +641,12 @@ public class DistrictGenerator implements election.sim.DistrictGenerator {
         boolean condition1 = new_ratio > 0.5 && old_ratio > 0.42 && old_ratio <0.5;
         boolean condition2 = new_ratio > 0.75 && old_ratio > 0.67 && old_ratio <0.75;
         boolean condition3 = new_ratio > 0.25 && old_ratio > 0.17 && old_ratio <0.25;
-        if ( condition1 || condition2 || condition3) {
+
+        boolean populationRestrict = swing_voters.size() < 4525 && swing_voters.size() > 3704
+                && other_voters.size() < 4525 && other_voters.size() > 3704;
+//        System.out.println(swing_voters.size() + "," + swing_voters_original.size() + "," + other_voters.size() + "," + other_voters_original.size());
+        //if none of the condition_i_other happens and one of the conditon 1 2 or 3 happens, then a valid state
+        if ( populationRestrict && (condition1 || condition2 || condition3) && !(condition1_other||condition2_other||condition3_other)) {
             return true;
         }
 
@@ -679,7 +735,6 @@ public class DistrictGenerator implements election.sim.DistrictGenerator {
 //        System.out.println("adj2" + convexAdjacent);
         if (board.contains(convexSwing) && board.contains(concaveAdjacent) &&
                 !convexSwing.overlap(concaveAdjacent) && isValidGerrymander(id, otherId, convexSwing, concaveAdjacent)) {
-            System.out.println("in");
             checkMap.put(id, true);
             checkMap.put(otherId, true);
             polygonMap.put(id, convexSwing);
@@ -689,7 +744,6 @@ public class DistrictGenerator implements election.sim.DistrictGenerator {
         }
         if (board.contains(concaveSwing) && board.contains(convexAdjacent) &&
                 !concaveSwing.overlap(convexAdjacent) && isValidGerrymander(id, otherId, concaveSwing, convexAdjacent)) {
-            System.out.println("in1");
             checkMap.put(id, true);
             checkMap.put(otherId, true);
             polygonMap.put(id, concaveSwing);
