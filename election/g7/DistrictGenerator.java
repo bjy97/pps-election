@@ -64,7 +64,6 @@ public class DistrictGenerator implements election.sim.DistrictGenerator {
             System.out.println("number of gerrymander: " + num + ", number of stripes: " + randomNumOfStripes + ", widthRatio: " + widthRatio +
                     ", stripeToExpand: " + stripeWithMoreBlocks);
         }
-
         return best;
     }
 
