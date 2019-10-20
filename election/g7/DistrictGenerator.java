@@ -9,21 +9,16 @@ public class DistrictGenerator implements election.sim.DistrictGenerator {
     private Random random;
     private int numVoters, numParties, numDistricts;
     private double eps = 1E-7;
-    private Map<Polygon2D, List<Voter>> polyganList = new HashMap<>();
     private Map<Integer, Polygon2D> polygonMap = new HashMap<>();
     private Map<Integer, List<Voter>> voterMap = new HashMap<>();
     private Map<Integer, Boolean> checkMap = new HashMap<>();
     private int partyToWin = 1;
     private Polygon2D board;
-    private int iteration = 20;
+    private int iteration = 5;
     private double widthRatio = 5;
     private int peopleInBlock;
 
     public List<Voter> sortByXCoordinate(List<Voter>voters){
-        board = new Polygon2D();
-        board.append(0., 0.);
-        board.append(1000., 0.);
-        board.append(500., 500. * Math.sqrt(3));
         Collections.sort(voters, new Comparator<Voter>() {
             @Override
             public int compare(Voter v1, Voter v2) {
@@ -35,6 +30,10 @@ public class DistrictGenerator implements election.sim.DistrictGenerator {
 
     @Override
     public List<Polygon2D> getDistricts(List<Voter> voters, int repPerDistrict, long seed) {
+        board = new Polygon2D();
+        board.append(0., 0.);
+        board.append(1000., 0.);
+        board.append(500., 500. * Math.sqrt(3));
         List<Polygon2D> result = new ArrayList<Polygon2D>();
         int numVoters = voters.size();
         //numDistricts = 243 / repPerDistrict;
@@ -51,10 +50,10 @@ public class DistrictGenerator implements election.sim.DistrictGenerator {
         int max = 0;
         List<Polygon2D> best = new ArrayList<>();
         for (int i = 0; i < iteration; i++) {
-            int randomNumOfStripes = random.nextInt(4) + 8;
+            int randomNumOfStripes = random.nextInt(4) + 10;
             int stripeWithMoreBlocks = randomNumOfStripes - (random.nextInt(randomNumOfStripes) + 1);
-            widthRatio = random.nextDouble()*10 + 5;
-            int num = createDistricts(randomNumOfStripes, numDistricts, voters, stripeWithMoreBlocks);
+            widthRatio =  random.nextDouble()*10 + 5;
+            int num = createDistricts(randomNumOfStripes, numDistricts, new ArrayList<>(voters), stripeWithMoreBlocks);
             if (max <= num) {
                 max = Math.max(num, max);
                 best = new ArrayList<>(polygonMap.values());
@@ -62,7 +61,6 @@ public class DistrictGenerator implements election.sim.DistrictGenerator {
             polygonMap.clear();
             voterMap.clear();
             checkMap.clear();
-            polyganList.clear();
             System.out.println("number of gerrymander: " + num + ", number of stripes: " + randomNumOfStripes + ", widthRatio: " + widthRatio +
                     ", stripeToExpand: " + stripeWithMoreBlocks);
         }
@@ -78,8 +76,6 @@ public class DistrictGenerator implements election.sim.DistrictGenerator {
         int blockEachStripe =  numDistricts / numStripes; //9;
         //Can contribute deviation
         int peopleInBlock = numVoters / numDistricts;
-        // From top to bottom
-        List<List<Voter>> votersInStripe = new ArrayList<>();
         int from = 0;
         double btm = 500*Math.sqrt(3);
         List<List<Voter>> voterList = new ArrayList<>();
@@ -91,7 +87,7 @@ public class DistrictGenerator implements election.sim.DistrictGenerator {
             int to = from + blockEachStripe*peopleInBlock - 1;
             if (i == numStripes - 1)
                 to = numVoters - 1;
-            while (to + 1 < numVoters && voters.get(to) == voters.get(to + 1))
+            while (to + 1 < numVoters && isEqual(voters.get(to).getLocation().getY(), voters.get(to + 1).getLocation().getY()))
                 to++;
             List<Voter> voter_by_y = voters.subList(from, to + 1);
             from = to + 1;
@@ -101,10 +97,11 @@ public class DistrictGenerator implements election.sim.DistrictGenerator {
             List<Double> x_coordinates=new ArrayList<>();
             //draw vertical lines in each stripe area
             for (int j=1;j<blockEachStripe;j++){
-                Double curr_x=voter_by_x.get((int)(voter_by_x.size()/blockEachStripe*j)).getLocation().getX();
-                x_coordinates.add(curr_x+eps);//8 doubles -->9
+                int end = (int)(voter_by_x.size()/blockEachStripe*j);
+                Double curr_x=voter_by_x.get(end).getLocation().getX();
+                x_coordinates.add(curr_x+2*eps);//8 doubles -->9
                 voterList.add(new ArrayList<>());
-                voterList.get(voterList.size() - 1).addAll(voter_by_x.subList((int)voter_by_x.size()/blockEachStripe*(j - 1), (int)voter_by_x.size()/blockEachStripe*j));
+                voterList.get(voterList.size() - 1).addAll(voter_by_x.subList((int)voter_by_x.size()/blockEachStripe*(j - 1), end));
             }
             voterList.add(new ArrayList<>());
             voterList.get(voterList.size() - 1).addAll(voter_by_x.subList((int)voter_by_x.size()/blockEachStripe*(blockEachStripe - 1), voter_by_x.size()));
@@ -252,11 +249,24 @@ public class DistrictGenerator implements election.sim.DistrictGenerator {
             }
         }
 
+        int c = 0;
         for (int i = 0; i < voterList.size(); i++) {
+            List<Voter> votersById = new ArrayList<>();
             polygonMap.put(i, result.get(i));
             checkMap.put(i, false);
-            voterMap.put(i, voterList.get(i));
+            int count = 0;
+            for (Voter voter : voters) {
+                if (result.get(i).strictlyContains(voter.getLocation())) {
+                    votersById.add(voter);
+                    count++;
+                }
+
+            }
+            voterMap.put(i, votersById);
+            System.out.println(count);
+            c += count;
         }
+        System.out.println(c);
 
         for (Map.Entry<Integer, Polygon2D> entry : polygonMap.entrySet()) {
             int id = entry.getKey();
@@ -641,12 +651,13 @@ public class DistrictGenerator implements election.sim.DistrictGenerator {
         boolean condition1 = new_ratio > 0.5 && old_ratio > 0.42 && old_ratio <0.5;
         boolean condition2 = new_ratio > 0.75 && old_ratio > 0.67 && old_ratio <0.75;
         boolean condition3 = new_ratio > 0.25 && old_ratio > 0.17 && old_ratio <0.25;
-
+        boolean isPeopleOnEdge = (swing_voters_original.size() + other_voters_original.size())
+                != (swing_voters.size() + other_voters.size());
         boolean populationRestrict = swing_voters.size() < 4525 && swing_voters.size() > 3704
                 && other_voters.size() < 4525 && other_voters.size() > 3704;
 //        System.out.println(swing_voters.size() + "," + swing_voters_original.size() + "," + other_voters.size() + "," + other_voters_original.size());
         //if none of the condition_i_other happens and one of the conditon 1 2 or 3 happens, then a valid state
-        if ( populationRestrict && (condition1 || condition2 || condition3) && !(condition1_other||condition2_other||condition3_other)) {
+        if (!isPeopleOnEdge && populationRestrict && (condition1 || condition2 || condition3) && !(condition1_other||condition2_other||condition3_other)) {
             return true;
         }
 
